@@ -3,6 +3,103 @@
 
 #define SW_SHOW 5
 
+
+/*
+universal shellcode는 kernel32.dll이 export하는 주소가 매번 바뀌어서 call하는 주소가 유효하지 않게된다
+정적으로 만들어진 일반적인 쉘코드의 한계를 극복하기 위해서 만들어졌다.
+
+kenrel32.dll이 process에 mapping되었을때, 해당 kernel32.dll을 얻어낸다음
+함수의 주소를 계산한다.
+
+kernel32.dll이 mapping된 곳은 PEB라고한다.
+
+따라서..
+
+universal shellcode를 만들기 위해서 PEB(process environment block)의 위치를 구해야한다.
+PEB의 위치를 구하는 과정에서 fs register를 이용한다.
+
+user mode의 fs register는 현재 프로세서의 TEB(thread environment block) 를 가르키고있다.
+kernel mode의 fs register는 KPCR (processor control region) 를 가르키고있다. (앞에 붙는 K의 뜻은 kernel의 약자같다.)
+KPCR은 schedule info들이 저장된다. (실행될 스레드들의 정보들, 큐 정보, ... 라고 한다.
+
+
+fs:0x30위치에 PEB가 존재한다.
+구조는 다음과 같다.
+
+typedef struct _PEB {
+  BYTE                          Reserved1[2];
+  BYTE                          BeingDebugged;
+  BYTE                          Reserved2[1];
+  PVOID                         Reserved3[2];
+  PPEB_LDR_DATA                 Ldr;
+  PRTL_USER_PROCESS_PARAMETERS  ProcessParameters;
+  BYTE                          Reserved4[104];
+  PVOID                         Reserved5[52];
+  PPS_POST_PROCESS_INIT_ROUTINE PostProcessInitRoutine;
+  BYTE                          Reserved6[128];
+  PVOID                         Reserved7[1];
+  ULONG                         SessionId;
+} PEB, *PPEB;
+
+typedef struct _PEB_LDR_DATA {
+  BYTE       Reserved1[8];	//sizeof(unsigned char) = 1,  sizeof(unsigned char) * 8 = 8
+  PVOID      Reserved2[3];	//sizeof(void *) = 4, sizeof(void *) * 2 = 8
+
+  //distance = (8 + 8 + 4) = 20 byte ( InMemoryOrderModuleList.Flink )
+
+  LIST_ENTRY InMemoryOrderModuleList;
+} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+PEB에서 (2 + 1 + 1 + 4 + 4 = 12) 만큼 더하면 PPEB_LDR_DATA Ldr (포인터 변수)의 주소가 나옴
+LoaderData가 가르키는 주소에서, (8 + (4 * 3) = 20)  만큼 더하면 LIST_ENTRY InMemoryOrderModuleList 의 주소가 나옴
+InMemoryOrderModuleList 은 이중링크를 가지고 있다.
+
+정보는 다음과 같다
+.
+typedef struct _LIST_ENTRY {
+   struct _LIST_ENTRY *Flink;
+   struct _LIST_ENTRY *Blink;
+} LIST_ENTRY, *PLIST_ENTRY, *RESTRICTED_POINTER PRLIST_ENTRY;
+
+FLink는 Front Link, BLink는 Back Link라는 뜻임 (맨 마지막 링크는 NULL을 가르키고있음)
+
+
+각각 링크는 LDR_DATA_TABLE_ENTRY를 가르키고있다.
+LDR_DATA_TABLE_ENTRY는 해당 프로세스가 로드한 DLL의 정보를 가지고있다.
+
+정보는 다음과 같다.
+
+typedef struct _LDR_DATA_TABLE_ENTRY {
+	PVOID Reserved1[2];
+	LIST_ENTRY InMemoryOrderLinks;
+	PVOID Reserved2[2];
+	PVOID DllBase;
+	PVOID EntryPoint;
+	PVOID Reserved3;
+	UNICODE_STRING FullDllName;
+	BYTE Reserved4[8];
+	PVOID Reserved5[3];
+	union {
+		ULONG CheckSum;
+		PVOID Reserved6;
+	};
+	ULONG TimeDateStamp;
+} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+
+여기서 주의해야 할 점은, Reserved1멤버부터 계산하지 않고, InMemoryOrderLinks부터 계산하여,  ((4 * 2) + (4 * 2)) = 16byte만큼 더하여 DllBase에 접근해야 한다는 점이다.
+이유는 InMemoryOrderLinks는 이중리스트이다, 당연히 계산했을때, Front Link부터 참조될것이다.
+Front Link부터 참조됨으로 32비트환경에서의 메모리주소크기 (4byte) 4개 뒤에 DllBase가 존재한다.
+
+DllBase는 mapping된 DLL의 주소를 가지고있다.
+
+DllBase가 가르키는 주소를 register에 참조시키는 방법은 역참조를 사용해야한다.
+mov는 레지스터, 변수를 4바이트만큼 복사한다. (movzx, movsx, movs)같은 명령은 4바이트보다 적거나, 큰 바이트를 복사한다.
+intel문법에서, 4바이트 역참조의 표현은 다음과 같다. mov register, [register]
+DllBase는 LPVOID형식임으로 mov를 사용한다.
+
+*/
+
+
 int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 {
 	int FindApiNameLength;
@@ -109,8 +206,6 @@ void shellcode()
 
 	__asm
 	{
-		xor edi, edi;
-
 		//eax holds PEB
 		//usermode fs register is pointing the PEB
 		mov eax, fs:0x30;
