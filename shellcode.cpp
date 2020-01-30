@@ -262,16 +262,16 @@ int GetApiAddress(int ModuleAddress, const char* Name)
 */
 
 
-void shellcode()
-{	
-	const int kernel32_string_hash = 816; //KERNEL32.DLL (Unicode string) hash value
+int _WinExec;
+int _ExitProcess;
 
-	char shell[] = "cmd";
-	char LpStrWinExec[] = "WinExec";
-	char LpStrExitProcess[] = "ExitProcess";
-
+int main()
+{
 	__asm
 	{
+		push ebp;
+		sub esp, 64;
+
 		//eax 레지스터에 PEB저장
 		mov eax, fs:0x30;
 
@@ -280,245 +280,128 @@ void shellcode()
 		//멤버에서 20만큼 더하면, LIST_ENTRY InMemoryOrderModuleList이다. 역참조를 통해서 Flink에 접근한다.
 		mov eax, [eax + 20];
 
-		//kernel32검증
-	get_next_front_link:;
-
 		//FLINK를 통해서 entry에 접근한다. 
 		//doubly linked list임으로 역참조를 통해서 다음 entry에 접근할수있다.
-
+		mov eax, [eax];
 		mov eax, [eax];
 
-		//KERNEL32.DLL 문자열값에 대한 해쉬값을 통해서 검증을 진행한다.
-		//다음은 유니코드 문자열 구조체이다.
-
-		/*
-typedef struct _LSA_UNICODE_STRING {
-	USHORT Length;			// + 36
-	USHORT MaximumLength;	// + 38
-	PWSTR  Buffer;			// + 40
-} LSA_UNICODE_STRING, * PLSA_UNICODE_STRING, UNICODE_STRING, * PUNICODE_STRING;
-		*/
-
-		//ebx holds DllNameLength
-		//4 byte to 2 byte (USHORT Length)
-
-		//Length 멤버는 flink를 통해 얻어낸 entry로부터 36다음 주소에 있다.
-		//문자열의 길이를 얻어내는 이유는, 유니코드이기 때문에 정확한 길이를 얻어낸다음 해쉬로 만들어야한다.
-		movsx ebx, word ptr[eax + 36];
-
-		//DLL의 이름을 알아내야한다.
-		//DLL의 이름의 주소는 flink를 통해 얻어낸 entry로부터 다음을 더하면 나온다.
-		//40	 = name
-		//40 - 8 = full path
-		//필요한 멤버는 name이다. 40을 더해서 이름값을 얻는다.
-		mov edx, [eax + 40];
-
-		xor esi, esi;
-		xor ecx, ecx;
-		
-
-	get_hash_lable:;
-
-		//edi에 byte단위의 인덱스접근을 통해 얻어낸 한 문장을 저장한다.
-		movsx edi, byte ptr[edx + esi];	
-		//hash (ecx)에 한 문장만큼 더한다.
-		add ecx, edi;						
-
-		//인덱스를 더한다.
-		add esi, 1;	
-		//길이와 인덱스를 비교한다.
-		cmp esi, ebx;
-		//길이와 인덱스가 같지 않을경우 반복한다.
-		jne get_hash_lable;
-		//길이와 인덱스가 같은경우 반복을 끝낸다.
-
-		//얻어낸 hash와 KERNEL32.DLL의 hash를 비교한다.
-		cmp ecx, kernel32_string_hash; 
-		//hash가 다를경우 다음 flink를 통해서 다음 entry에 접근해서 KERNEL32.DLL의 hash값을 가진 문자열이 나올때 까지 반복하게된다.
-		jne get_next_front_link;
-		//hash가 같을경우 반복하지않는다.
-		
 		//실행파일의 실제 주소 (MZ)를 구한다. flink를 이용해 얻어낸 entry로 부터 16다음 주소에 있다.
 		mov ebx, [eax + 16];
-		//스택에 저장한다. 
-		mov [ebp - 20], ebx;	//MZ
 
-		//함수선언을 위해서 쉘코드 메인으로 점프한다.
-		jmp START_CALL;
+		//module address
+		mov[ebp - 24], ebx;
 
-		//함수선언
-	_GetApiAddress:;
-		mov edi, [ebp + 8]; //KERNEL32의 주소가 저장되어있다.
+		mov edi, ebx;
 
-		/*
-		Image Dos Header에서 0x3c주소는 0xe8을 가르키고있고, 0xe8의 의미는 'PE header' 이다.
-		(실제로 PE 시그니처가 존재한다.)
-		PE header의 첫부분에서, 0x78만큼 더한다면 IMAGE_EXPORT_DIRECTORY의 RVA가 나온다.
-		*/
-		mov edi, [ebx + 0x3c];  //PE Header location
-		add edi, ebx;			//add DllBase
-		mov edi, [edi + 0x78];	//IMAGE_OPTIONAL_HEADER in Export Table RVA address
-		add edi, ebx;			//add DllBase
-		mov edx, edi;			//._export IMAGE_EXPORT_DIRECTORY
+		//DOS to NT
+		mov eax, [ebx + 0x3c];
+		add eax, ebx;
 		
-		//스택에 EAT저장
-		mov[ebp - 12], edx;
+		//NT to Export Table
+		mov eax, [eax + 120];
+		add eax, ebx;
 
-		//찾으려는 API name에 대한 hash를 구한다.
-		xor eax, eax;
-		xor ecx, ecx;
+		//export table..
 
-		xor esi, esi;
+		//number of names
+		mov ecx, [eax + 24];
+		mov[ebp - 8], ecx;
 
-		//API name의 주소값을 ebx에 저장
-		mov ebx, [ebp + 12];
+		//Export Address Table
+		mov ecx, [eax + 28];
+		mov[ebp - 12], ecx;
 
-	_NAME_HASH:;
-		//인덱스로 접근한 한문장을 edx에 저장
-		movsx edx, byte ptr[ebx + ecx];
-		//한문장만큼 eax에 더함
-		add eax, edx;
-		
-		//인덱스를 더함
-		add ecx, 1;
+		//Export Name Table	
+		mov ecx, [eax + 32];
+		mov[ebp - 16], ecx;
 
-		//esi == 0, NULL terminate string임으로, 문자열의 끝을 확인.
-		cmp edx, esi;
-		//문자열의 끝일때 반복을 종료함.
-		//eax에 hash값이 있음.
-		jne _NAME_HASH;
-
-		//hash값 스택에 저장.
-		mov[ebp - 16], eax;
+		//Export Ordinal Table
+		mov ecx, [eax + 36];
+		mov[ebp - 20], ecx;
 
 
-		//API export name조사.
-		//EAT 접근
-		mov eax, [ebp - 12];
-		//EAT + 32는 Name Pointer Table
-		add eax, 32;
-		//역참조를 통해서 Name Pointer Table에 접근
-		mov eax, [eax];
-		//RVA값임으로, VA를 더하여 Name Pointer Table의 실제주소를 얻음.
-		add eax, [ebp + 8];
+		jmp SHELLCODE_MAIN;
 
-		xor esi, esi;
+	_GetProcAddress:;
+		//eax is function name hash
+		//edi is return value
+		//The return value is exported function's address of the kernel32.dll
 
-	_LOOP:;
-		//인덱스을 메모리주소값으로 변환하는 과정이다.
-		//인덱스 * 4 값으로 더하여 문자열을 참조하는 이유는, 포인터의 크기가 4byte이기 때문이다
-		mov ebx, [eax + esi * 4];
-		//RVA값인 문자열주소임으로, VA를 더하여 실제 문자열 주소를 얻음.
-		add ebx, [ebp + 8];
-		//ebx는 API이름 문자열을 가르키고있음.
+		//ebp - 16 is holds NPT
+		mov ebx, [ebp - 16];
 
-		xor ecx, ecx;
+		//NPT rva to va
+		add ebx, edi;
+
 		xor edi, edi;
 
-	__LOOP:;
-		//edx는 인덱스를 통해 접근한 한 문자를 가지고있음
-		movsx edx, byte ptr[ebx + ecx];
-		//edi에 edx를 더함
-		add edi, edx;
-		//문자열 인덱스를 더함
-		add ecx, 1;
+	_GetFunctionName:;
+		mov edx, [ebx];
+		add edx, [ebp - 24];
+		
+		xor esi, esi;
 
-		//null terminate string임으로, 0과 한문자를 비교해서 문자열의 끝을 알아냄
-		cmp edx, 0;
-		jne __LOOP;
-		//문자열의 끝일때 반복을 끝낸다.
-
-		//찾으려는API 이름의 hash와 현재 얻어낸 API이름의 hash를 비교한다.
-		cmp edi, [ebp - 16];
-		//같을경우 반복을 종료한다.
-		je BREAK_LABLE;
-
-		//다를경우 인덱스를 더한다음 반복한다.
-		add esi, 1;
-		jmp _LOOP;
-
-	BREAK_LABLE:;
-
-		//아래내용은 Ordinal Table, Export Address Table을 이용해서 Export Function Address를 얻는다.
-		//문서화되지않았음. 문서화필요
-
-		//get ordinal number of the function
-		mov ebx, [ebp - 12];
-		add ebx, 36;
-		mov ebx, [ebx];
-
-		mov eax, 2;
-		mov ecx, esi;
-		mul ecx;
-
-		add ebx, eax;
-		add ebx, [ebp + 8];
-
-		movsx edx, word ptr[ebx];
-
-		//ordinal is started from one
+	_GetNameHash:;
+		movsx ecx, byte ptr[edx];
 		add edx, 1;
 
-		//get function address
-		mov ebx, [ebp - 12];
-		add ebx, 28;
-		mov ebx, [ebx];
+		add esi, ecx;
 
-		add ebx, [ebp + 8];
+		cmp ecx, 0;
+		jne _GetNameHash;
 
-		mov eax, 4;
-		mul edx;
-		sub eax, 4;
+		add edi, 1;
+		add ebx, 4;
 
+		cmp edi, [ebp - 8];
+		je _GetProcAddressRet;
+
+		cmp esi, eax;
+		jne _GetFunctionName;
+
+		sub edi, 1;
+
+		// index * 2;
+		mov eax, 2;
+		mul edi;
+		//eax holds mul operation result		
+		
+		mov ebx, [ebp - 20];
 		add ebx, eax;
+		add ebx, [ebp - 24];
+		
+		movsx ecx, word ptr[ebx];
+	
+		mov eax, 4;
+		mul ecx;
 
-		mov ebx, [ebx];
-		add ebx, [ebp + 8];
+		//export address table
+		mov edi, [ebp - 12];
 
-		mov eax, ebx;
+		//get EAT
+		add edi, eax;
+		add edi, [ebp - 24];
+
+		mov edi, [edi];
+		add edi, [ebp - 24];
+
+		_GetProcAddressRet:;
+
 		ret;
 
-		//쉘코드 메인
-	START_CALL:;
-		
-		//GetModuleHandle, GetProcAddress을 구현한 함수를 통해서 kernel32.dll의 export function address를 얻어낸다.
-		//스택을 통해서 인자값을 전달한다.
+	SHELLCODE_MAIN:;
 
-		//WinExec API의 주소를 얻는 사용자정의 함수 호출
-		//인자준비
-		mov eax, [ebp - 20];
-		mov [ebp + 8], eax;
-		lea ecx, [LpStrWinExec];
-		mov[ebp + 12], ecx;
-		//함수호출
-		call _GetApiAddress;
-		
-		//export function address는 eax에 저장된다.
-		//WinExec API호출
-		push 5; //5 means SW_SHOW
-		lea ebx, [shell];
-		push ebx;
-		call eax;
+		mov eax, 0x2b3;
+		call _GetProcAddress;
+		//edi holds function address
 
-		//ExitProcess API의 주소를 얻는 사용자 정의 함수 호출
-		//인자준비
-		mov ebx, [ebp - 20];
-		mov[ebp + 8], ebx;
-		lea ecx, [LpStrExitProcess];
-		mov[ebp + 12], ecx;
-		//함수호출
-		call _GetApiAddress;
+		mov eax, 0x479;
+		call _GetProcAddress;
+		//edi holds function address
 
-		//ExitProcess API호출
-		push 0;
-		call eax;
+		add esp, 64;
+		pop ebp;
 	}
-}
-
-
-int main()
-{
-	shellcode();
 
 	return 0;
 }
