@@ -331,7 +331,8 @@ int main()
 		mov ebx, [ebp - 16];
 
 		//NPT rva to va
-		add ebx, edi;
+		
+		add ebx, [ebp - 24];
 
 		xor edi, edi;
 
@@ -390,14 +391,13 @@ int main()
 		ret;
 
 	SHELLCODE_MAIN:;
+		//edi holds function address
 
 		mov eax, 0x2b3;
 		call _GetProcAddress;
-		//edi holds function address
-
+		
 		mov eax, 0x479;
 		call _GetProcAddress;
-		//edi holds function address
 
 		add esp, 64;
 		pop ebp;
